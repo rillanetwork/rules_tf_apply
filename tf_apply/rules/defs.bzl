@@ -12,8 +12,7 @@ def tf_init_impl(ctx):
         ctx: The rule context
 
     Returns:
-        An executable DefaultInfo object with the output of the init script.
-        Containing the tar archived output .terraform directory.
+        An executable DefaultInfo object with the output init script.
     """
 
     tf_toolchain = ctx.toolchains["@rules_tf//:tf_toolchain_type"]
