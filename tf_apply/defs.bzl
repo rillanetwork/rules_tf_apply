@@ -22,14 +22,17 @@ def tf_module(name, **kwargs):
     tf_init(
         name = "init",
         module = native.package_relative_label(name),
+        tags = kwargs.get("tags", []),
     )
 
     tf_plan(
         name = "plan",
         module = native.package_relative_label(name),
+        tags = kwargs.get("tags", []),
     )
 
     tf_apply(
         name = "apply",
         module = native.package_relative_label(name),
+        tags = kwargs.get("tags", []),
     )
