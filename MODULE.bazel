@@ -1,0 +1,11 @@
+""" This file is used to define the module for the Peer Core repository."""
+
+module(
+    name = "rules_tf_apply",
+    repo_name = "rules_tf_apply",
+)
+
+bazel_dep(name = "buildifier_prebuilt", version = "8.0.1", dev_dependency = True)
+
+bazel_dep(name = "rules_tf", version = "0.0.10")
+bazel_dep(name = "package_metadata", version = "0.0.5")

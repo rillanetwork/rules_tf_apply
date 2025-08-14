@@ -1,1 +1,58 @@
 # Rules for applying TF (Terraform / Tofu) modules using Bazel.
+
+This module provides rules to initialize, plan, and apply Terraform modules using Bazel.
+This effectively enables using tools like bazel-diff to selectively
+apply changes to Terraform modules only when necessary.
+
+## Usage
+
+This depends on the `rules_tf` module, which provides the necessary
+toolchain and providers for Terraform.
+
+```python
+# MODULE.bazel
+
+bazel_dep(name = "rules_tf_apply", version = "0.1.0")
+bazel_dep(name = "rules_tf", version = "0.0.10")
+
+tf = use_extension("@rules_tf//tf:extensions.bzl", "tf_repositories", dev_dependency = True)
+tf.download(
+    mirror = {
+        "random": "hashicorp/random:3.3.2",
+        "null": "hashicorp/null:3.1.1",
+        "aws": "hashicorp/aws:>=5.0.0",
+    },
+    tfdoc_version = "0.19.0",
+    tflint_version = "0.53.0",
+    use_tofu = False,
+    version = "1.12.2",
+)
+use_repo(tf, "tf_toolchains")
+
+register_toolchains(
+    "@tf_toolchains//:all",
+    dev_dependency = True,
+)
+```
+
+and on the `BUILD.bazel` file:
+
+```python
+# BUILD.bazel
+
+load("@rules_tf_apply//tf_apply:defs.bzl", "tf_module")
+
+tf_module(
+    name = "my_tf_module",
+    providers = [
+        "aws",
+    ],
+    providers_versions = ":providers",
+    tags = [
+        "terraform",
+    ],
+    deps = [
+        "//:my_other_module",
+    ],
+)
+```
