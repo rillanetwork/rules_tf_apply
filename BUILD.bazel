@@ -1,0 +1,61 @@
+load("@buildifier_prebuilt//:rules.bzl", "buildifier")
+load("@package_metadata//licenses:defs.bzl", "license")
+load("@package_metadata//purl:purl.bzl", "purl")
+load("@package_metadata//rules:package_metadata.bzl", "package_metadata")
+
+package(
+    default_package_metadata = ["//:package_metadata"],
+    default_visibility = ["//visibility:public"],
+)
+
+package_metadata(
+    name = "package_metadata",
+    attributes = [
+        ":license",
+    ],
+    purl = purl.bazel(
+        module_name(),
+        module_version(),
+    ),
+)
+
+license(
+    name = "license",
+    kind = "@package_metadata//licenses/spdx:Apache-2.0",
+)
+
+filegroup(
+    name = "standard_package",
+    srcs =
+        [
+            ".bazelignore",
+            "BUILD.bazel",
+            "LICENSE",
+            "MODULE.bazel",
+        ],
+    visibility = ["//distro:__pkg__"],
+)
+
+# Buildifier
+
+buildifier(
+    name = "buildifier.fix",
+    exclude_patterns = [
+        "./.git/*",
+        "./node_modules/*",
+    ],
+    lint_mode = "fix",
+    lint_warnings = ["-all"],
+    mode = "fix",
+)
+
+buildifier(
+    name = "buildifier.check",
+    exclude_patterns = [
+        "./.git/*",
+        "./node_modules/*",
+    ],
+    lint_mode = "warn",
+    lint_warnings = ["-all"],
+    mode = "diff",
+)
