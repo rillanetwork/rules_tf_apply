@@ -17,12 +17,16 @@ fi
 OUT_DIR="$BUILD_WORKSPACE_DIRECTORY/bazel-tf/$TF_DIR"
 mkdir -p "$OUT_DIR"
 
+# Init on a clean TF_DIR
+rm -rf "$PWD/$TF_DIR/.terraform"
+rm "$PWD/$TF_DIR/.terraform.lock.hcl"
+
 # Run terraform init
 $TF_BIN_PATH -chdir="$TF_DIR" init -input=false -plugin-dir="$TF_PLUGINS_DIR"
 
 # remove any existing .terraform and .terraform.lock.hcl files
 rm -rf "$OUT_DIR/.terraform"
-rm -f "$OUT_DIR/.terraform.lock.hcl"
+rm "$OUT_DIR/.terraform.lock.hcl"
 
 # symlink the .terraform directory to the output directory
 ln -s  "$PWD/$TF_DIR/.terraform" "$OUT_DIR/.terraform"
