@@ -3,11 +3,12 @@ This module provides macros and rules for initializing, planning, and applying T
 """
 
 load("@rules_tf//tf:def.bzl", _tf_module = "tf_module")
-load("@rules_tf_apply//tf_apply/rules:defs.bzl", _tf_apply = "tf_apply", _tf_init = "tf_init", _tf_plan = "tf_plan")
+load("@rules_tf_apply//tf_apply/rules:defs.bzl", _tf_apply = "tf_apply", _tf_init = "tf_init", _tf_plan = "tf_plan", _tf_vars = "tf_vars")
 
 tf_apply = _tf_apply
 tf_init = _tf_init
 tf_plan = _tf_plan
+tf_vars = _tf_vars
 
 def tf_module(name, **kwargs):
     """
@@ -17,22 +18,35 @@ def tf_module(name, **kwargs):
         name: The name of the Terraform module.
         **kwargs: Additional attributes for the module.
     """
+
+    # Remove tfvars_deps from kwargs to avoid passing it to _tf_module
+    tfvars_deps = kwargs.pop("tfvars_deps", {})
+
     _tf_module(name = name, **kwargs)
+
+    tf_vars(
+        name = "tfvars",
+        tfvars_deps = tfvars_deps,
+        module = native.package_relative_label(name),
+    )
 
     tf_init(
         name = "init",
         module = native.package_relative_label(name),
+        tfvars = ":tfvars",
         tags = kwargs.get("tags", []),
     )
 
     tf_plan(
         name = "plan",
         module = native.package_relative_label(name),
+        tfvars = ":tfvars",
         tags = kwargs.get("tags", []),
     )
 
     tf_apply(
         name = "apply",
         module = native.package_relative_label(name),
+        tfvars = ":tfvars",
         tags = kwargs.get("tags", []),
     )
