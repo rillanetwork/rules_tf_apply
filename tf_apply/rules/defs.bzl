@@ -4,6 +4,80 @@ Starlark rules for initializing, planning, and applying Terraform modules using 
 
 load("@rules_tf//tf/rules:providers.bzl", "TfModuleInfo")
 
+def relative_path(path, other_path):
+    """
+    Returns the relative path from `other_path` to `path`, given both paths have the same root.
+
+    Args:
+        path: The target path
+        other_path: The base path
+
+    Returns:
+        The relative path from `other_path` to `path`.
+    """
+
+    path_parts = path.split("/")
+    other_path_parts = other_path.split("/")
+
+    # Find common prefix
+    common_length = 0
+    for p1, p2 in zip(path_parts, other_path_parts):
+        if p1 == p2:
+            common_length += 1
+        else:
+            break
+
+    # Calculate the relative path
+    relative_parts = [".."] * (len(other_path_parts) - common_length) + path_parts[common_length:]
+    return "/".join(relative_parts)
+
+def tf_vars_impl(ctx):
+    """
+    Generates a tfvars file from the provided key-value pairs.
+
+    Args:
+        ctx: The rule context
+
+    Returns:
+        DefaultInfo with the generated tfvars file.
+    """
+
+    tfvars_file = ctx.actions.declare_file("bazel.auto.tfvars")
+
+    tfvar_deps = []
+    tfvars = {}
+    for key, target in ctx.attr.tfvars_deps.items():
+        tfvar_deps.extend(target.files.to_list())
+
+        rel_path = relative_path(target.files.to_list()[0].short_path, ctx.attr.module.label.package)
+        tfvars[key] = rel_path
+
+    ctx.actions.write(
+        output = tfvars_file,
+        content = "\n".join(['{}="{}"'.format(key, value) for key, value in tfvars.items()]) + "\n",
+    )
+
+    return [DefaultInfo(files = depset([tfvars_file], transitive = [depset(tfvar_deps)]))]
+
+tf_vars = rule(
+    implementation = tf_vars_impl,
+    attrs = {
+        "tfvars_deps": attr.string_keyed_label_dict(
+            default = {},
+            doc = "Mapping of tfvars to labels containing the files.",
+        ),
+        "module": attr.label(
+            allow_single_file = True,
+            mandatory = True,
+            doc = "The Tf module to apply.",
+        ),
+    },
+    # outputs = {"tfvars": "bazel.tfvars"},
+    doc = """
+    Generates a tfvars file from the provided key-value pairs.
+    """,
+)
+
 def tf_init_impl(ctx):
     """
     Builds a script to run tf init for the specified module.
@@ -29,8 +103,10 @@ def tf_init_impl(ctx):
         },
     )
 
+    tfvars_deps = (ctx.attr.tfvars[DefaultInfo].files.to_list() if ctx.attr.tfvars else [])
+
     # Run the init script
-    deps = ctx.attr.module[TfModuleInfo].transitive_srcs.to_list() + tf_toolchain.runtime.deps
+    deps = ctx.attr.module[TfModuleInfo].transitive_srcs.to_list() + tf_toolchain.runtime.deps + tfvars_deps
 
     return [DefaultInfo(
         executable = init_script,
@@ -45,6 +121,9 @@ tf_init = rule(
             allow_single_file = True,
             mandatory = True,
             doc = "The Tf module to apply.",
+        ),
+        "tfvars": attr.label(
+            doc = "The tfvars target to use for the module.",
         ),
         "_script_template": attr.label(
             default = Label(":tf_init.sh"),
@@ -81,8 +160,10 @@ def tf_plan_impl(ctx):
         },
     )
 
+    tfvars_deps = (ctx.attr.tfvars[DefaultInfo].files.to_list() if ctx.attr.tfvars else [])
+
     # Run the init script
-    deps = ctx.attr.module[TfModuleInfo].transitive_srcs.to_list() + tf_toolchain.runtime.deps
+    deps = ctx.attr.module[TfModuleInfo].transitive_srcs.to_list() + tf_toolchain.runtime.deps + tfvars_deps
 
     return [DefaultInfo(
         executable = plan_script,
@@ -97,6 +178,9 @@ tf_plan = rule(
             allow_single_file = True,
             mandatory = True,
             doc = "The Tf module to apply.",
+        ),
+        "tfvars": attr.label(
+            doc = "The tfvars target to use for the module.",
         ),
         "_script_template": attr.label(
             default = Label(":tf_plan.sh"),
@@ -133,7 +217,9 @@ def tf_apply_impl(ctx):
         },
     )
 
-    deps = ctx.attr.module[TfModuleInfo].transitive_srcs.to_list() + tf_toolchain.runtime.deps
+    tfvars_deps = (ctx.attr.tfvars[DefaultInfo].files.to_list() if ctx.attr.tfvars else [])
+
+    deps = ctx.attr.module[TfModuleInfo].transitive_srcs.to_list() + tf_toolchain.runtime.deps + tfvars_deps
 
     return [DefaultInfo(
         executable = apply_script,
@@ -148,6 +234,9 @@ tf_apply = rule(
             allow_single_file = True,
             mandatory = True,
             doc = "The Tf module to apply.",
+        ),
+        "tfvars": attr.label(
+            doc = "The tfvars target to use for the module.",
         ),
         "_script_template": attr.label(
             default = Label(":tf_apply.sh"),
