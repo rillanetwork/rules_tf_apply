@@ -21,6 +21,7 @@ def tf_module(name, **kwargs):
 
     # Remove tfvars_deps from kwargs to avoid passing it to _tf_module
     tfvars_deps = kwargs.pop("tfvars_deps", {})
+    visibility = kwargs.get("visibility", ["//visibility:private"])
 
     _tf_module(name = name, **kwargs)
 
@@ -28,6 +29,7 @@ def tf_module(name, **kwargs):
         name = "tfvars",
         tfvars_deps = tfvars_deps,
         module = native.package_relative_label(name),
+        visibility = visibility,
     )
 
     tf_init(
@@ -35,6 +37,7 @@ def tf_module(name, **kwargs):
         module = native.package_relative_label(name),
         tfvars = ":tfvars",
         tags = kwargs.get("tags", []),
+        visibility = visibility,
     )
 
     tf_plan(
@@ -42,6 +45,7 @@ def tf_module(name, **kwargs):
         module = native.package_relative_label(name),
         tfvars = ":tfvars",
         tags = kwargs.get("tags", []),
+        visibility = visibility,
     )
 
     tf_apply(
@@ -49,4 +53,5 @@ def tf_module(name, **kwargs):
         module = native.package_relative_label(name),
         tfvars = ":tfvars",
         tags = kwargs.get("tags", []),
+        visibility = visibility,
     )
