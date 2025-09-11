@@ -4,8 +4,6 @@
 # It needs terraform plan to be run first and depends on the plan generated
 # on the bazel-tf directory.
 
-set -euo pipefail
-
 TF_BIN_PATH="${PWD}/%TF_BIN_PATH%"
 TF_DIR="%TF_DIR%"
 TF_PLUGINS_DIR="${PWD}/%TF_PLUGINS_DIR%"

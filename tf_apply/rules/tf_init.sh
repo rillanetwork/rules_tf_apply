@@ -3,8 +3,6 @@
 # Invokes `terraform init` in the specified Terraform directory.
 # The output .terraform directory and lock file are symlinked to bazel-tf on the workspace root.
 
-set -euo pipefail
-
 TF_BIN_PATH="${PWD}/%TF_BIN_PATH%"
 TF_DIR="%TF_DIR%"
 TF_PLUGINS_DIR="${PWD}/%TF_PLUGINS_DIR%"
