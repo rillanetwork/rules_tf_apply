@@ -26,6 +26,9 @@ if [ ! -f "$OUT_DIR/.terraform.lock.hcl" ]; then
 fi
 
 # symlink the .terraform directory from the output directory
+# Ensure that any existing .terraform directory or .terraform.lock.hcl file is removed first
+test -d "$TF_DIR/.terraform" && rm -rf "$TF_DIR/.terraform"
+test -f "$TF_DIR/.terraform.lock.hcl" && rm -rf "$TF_DIR/.terraform.lock.hcl"
 ln -sfn "$OUT_DIR/.terraform" "$TF_DIR/.terraform"
 ln -sfn "$OUT_DIR/.terraform.lock.hcl" "$TF_DIR/.terraform.lock.hcl"
 
