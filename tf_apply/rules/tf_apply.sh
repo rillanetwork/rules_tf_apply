@@ -37,6 +37,6 @@ test -d "$TF_DIR/.terraform" && rm -rf "$TF_DIR/.terraform"
 test -f "$TF_DIR/.terraform.lock.hcl" && rm -rf "$TF_DIR/.terraform.lock.hcl"
 ln -sfn "$OUT_DIR/.terraform" "$TF_DIR/.terraform"
 ln -sfn "$OUT_DIR/.terraform.lock.hcl" "$TF_DIR/.terraform.lock.hcl"
-ln -sfn "$OUT_DIR/plan.tfplan" "$TF_DIR/.terraform/plan.tfplan"
+ln -sfn "$OUT_DIR/plan.tfplan" "$TF_DIR/plan.tfplan"
 
-$TF_BIN_PATH -chdir="$TF_DIR" apply -input=false -auto-approve
+$TF_BIN_PATH -chdir="$TF_DIR" apply -input=false -auto-approve "plan.tfplan"

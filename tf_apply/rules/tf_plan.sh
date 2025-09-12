@@ -29,10 +29,12 @@ fi
 # Ensure that any existing .terraform directory or .terraform.lock.hcl file is removed first
 test -d "$TF_DIR/.terraform" && rm -rf "$TF_DIR/.terraform"
 test -f "$TF_DIR/.terraform.lock.hcl" && rm -rf "$TF_DIR/.terraform.lock.hcl"
+test -f "$TF_DIR/plan.tfplan" && rm -rf "$TF_DIR/plan.tfplan"
+
 ln -sfn "$OUT_DIR/.terraform" "$TF_DIR/.terraform"
 ln -sfn "$OUT_DIR/.terraform.lock.hcl" "$TF_DIR/.terraform.lock.hcl"
 
-$TF_BIN_PATH -chdir="$TF_DIR" plan -input=false -out=".terraform/plan.tfplan"
+$TF_BIN_PATH -chdir="$TF_DIR" plan -input=false -out="plan.tfplan"
 
 # symlink the plan output to the output directory
-ln -sfn "$PWD/$TF_DIR/.terraform/plan.tfplan" "$OUT_DIR/plan.tfplan"
+ln -sfn "$PWD/$TF_DIR/plan.tfplan" "$OUT_DIR/plan.tfplan"
