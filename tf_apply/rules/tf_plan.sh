@@ -1,7 +1,9 @@
-#!/bin/sh
+#!/usr/bin/env bash
 
 # Invokes `terraform plan` in the specified Terraform directory.
 # The output plan file is symlinked to bazel-tf on the workspace root.
+
+set -euo pipefail
 
 TF_BIN_PATH="${PWD}/%TF_BIN_PATH%"
 TF_DIR="%TF_DIR%"
