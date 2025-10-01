@@ -15,6 +15,11 @@ if [ -z "${BUILD_WORKSPACE_DIRECTORY:-}" ]; then
     exit 1
 fi
 
+# Accept additional terraform arguments passed via bazel -- syntax
+if [ $# -gt 0 ]; then
+    echo "Additional terraform arguments provided: $*"
+fi
+
 OUT_DIR="$BUILD_WORKSPACE_DIRECTORY/bazel-tf/$TF_DIR"
 
 # Check .terraform directory and .terraform.lock.hcl file
@@ -41,4 +46,4 @@ ln -sfn "$OUT_DIR/.terraform" "$TF_DIR/.terraform"
 ln -sfn "$OUT_DIR/.terraform.lock.hcl" "$TF_DIR/.terraform.lock.hcl"
 ln -sfn "$OUT_DIR/plan.tfplan" "$TF_DIR/plan.tfplan"
 
-$TF_BIN_PATH -chdir="$TF_DIR" apply -input=false -auto-approve "plan.tfplan"
+$TF_BIN_PATH -chdir="$TF_DIR" apply -input=false -auto-approve "plan.tfplan" $@
