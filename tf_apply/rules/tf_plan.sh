@@ -8,10 +8,17 @@ set -euo pipefail
 TF_BIN_PATH="${PWD}/%TF_BIN_PATH%"
 TF_DIR="%TF_DIR%"
 TF_PLUGINS_DIR="${PWD}/%TF_PLUGINS_DIR%"
+TF_ARGS=""
 
 if [ -z "${BUILD_WORKSPACE_DIRECTORY:-}" ]; then
     echo "BUILD_WORKSPACE_DIRECTORY is not set. Please set it before running this script."
     exit 1
+fi
+
+# Accept additional terraform arguments passed via bazel -- syntax
+if [ $# -gt 0 ]; then
+    echo "Additional terraform arguments provided: $*"
+    TF_ARGS="$TF_ARGS $*"
 fi
 
 OUT_DIR="$BUILD_WORKSPACE_DIRECTORY/bazel-tf/$TF_DIR"
@@ -36,7 +43,7 @@ test -f "$TF_DIR/plan.tfplan" && rm -rf "$TF_DIR/plan.tfplan"
 ln -sfn "$OUT_DIR/.terraform" "$TF_DIR/.terraform"
 ln -sfn "$OUT_DIR/.terraform.lock.hcl" "$TF_DIR/.terraform.lock.hcl"
 
-$TF_BIN_PATH -chdir="$TF_DIR" plan -input=false -out="plan.tfplan"
+$TF_BIN_PATH -chdir="$TF_DIR" plan -input=false -out="plan.tfplan" $TF_ARGS
 
 # symlink the plan output to the output directory
 ln -sfn "$PWD/$TF_DIR/plan.tfplan" "$OUT_DIR/plan.tfplan"
