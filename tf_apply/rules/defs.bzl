@@ -42,7 +42,7 @@ def tf_vars_impl(ctx):
         DefaultInfo with the generated tfvars file.
     """
 
-    tfvars_file = ctx.actions.declare_file("bazel.auto.tfvars")
+    tfvars_file = ctx.actions.declare_file("{}.bazel.auto.tfvars".format(ctx.attr.module.label.name))
 
     tfvar_deps = []
     tfvars = dict(ctx.attr.tfvars)
@@ -94,7 +94,7 @@ def tf_backend_impl(ctx):
         An empty list as this rule does not produce any outputs.
     """
 
-    backend_file = ctx.actions.declare_file("bazel.backend.tf")
+    backend_file = ctx.actions.declare_file("{}.bazel.backend.tf".format(ctx.attr.module.label.name))
     backend_content = 'terraform {{\n  backend "{}" {{\n'.format(ctx.attr.type)
     for key, value in ctx.attr.config.items():
         backend_content += '    {} = "{}"\n'.format(key, value)
