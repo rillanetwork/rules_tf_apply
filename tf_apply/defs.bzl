@@ -32,6 +32,7 @@ def tf_root_module(
 
     tf_vars(
         name = "{}.tfvars".format(name),
+        name_prefix = name,
         module = module,
         tfvars_deps = tfvars_deps,
         tfvars = tfvars,
@@ -48,6 +49,7 @@ def tf_root_module(
 
         tf_backend(
             name = "{}.backend".format(name),
+            name_prefix = name,
             type = backend_type,
             config = backend_config,
             visibility = visibility,
