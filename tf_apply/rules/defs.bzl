@@ -41,11 +41,11 @@ def tf_vars_impl(ctx):
     Returns:
         DefaultInfo with the generated tfvars file.
     """
-
-    tfvars_file = ctx.actions.declare_file("bazel.auto.tfvars")
+    tfvars_file = ctx.actions.declare_file("{}.bazel.auto.tfvars".format(ctx.attr.name_prefix))
 
     tfvar_deps = []
-    tfvars = {}
+    tfvars = dict(ctx.attr.tfvars)
+
     for key, target in ctx.attr.tfvars_deps.items():
         tfvar_deps.extend(target.files.to_list())
 
@@ -62,6 +62,7 @@ def tf_vars_impl(ctx):
 tf_vars = rule(
     implementation = tf_vars_impl,
     attrs = {
+        "name_prefix": attr.string(),
         "tfvars_deps": attr.string_keyed_label_dict(
             default = {},
             doc = "Mapping of tfvars to labels containing the files.",
@@ -71,10 +72,56 @@ tf_vars = rule(
             mandatory = True,
             doc = "The Tf module to apply.",
         ),
+        "tfvars": attr.string_dict(
+            default = {},
+            doc = "Mapping of tfvars to string values.",
+        ),
     },
     # outputs = {"tfvars": "bazel.tfvars"},
     doc = """
     Generates a tfvars file from the provided key-value pairs.
+    """,
+)
+
+def tf_backend_impl(ctx):
+    """
+    Defines the backend configuration for a Terraform root module.
+
+    Args:
+        ctx: The rule context
+
+    Returns:
+        An empty list as this rule does not produce any outputs.
+    """
+
+    backend_file = ctx.actions.declare_file("{}.bazel.backend.tf".format(ctx.attr.name_prefix))
+    backend_content = 'terraform {{\n  backend "{}" {{\n'.format(ctx.attr.type)
+    for key, value in ctx.attr.config.items():
+        backend_content += '    {} = "{}"\n'.format(key, value)
+    backend_content += "  }\n}\n"
+
+    ctx.actions.write(
+        output = backend_file,
+        content = backend_content,
+    )
+
+    return [DefaultInfo(files = depset([backend_file], transitive = []))]
+
+tf_backend = rule(
+    implementation = tf_backend_impl,
+    attrs = {
+        "name_prefix": attr.string(),
+        "type": attr.string(
+            mandatory = True,
+            doc = "The backend type.",
+        ),
+        "config": attr.string_dict(
+            default = {},
+            doc = "The backend configuration.",
+        ),
+    },
+    doc = """
+    Defines the backend configuration for a Terraform root module.
     """,
 )
 
@@ -104,13 +151,19 @@ def tf_init_impl(ctx):
     )
 
     tfvars_deps = (ctx.attr.tfvars[DefaultInfo].files.to_list() if ctx.attr.tfvars else [])
+    backend_deps = (ctx.attr.backend[DefaultInfo].files.to_list() if ctx.attr.backend else [])
 
-    # Run the init script
-    deps = ctx.attr.module[TfModuleInfo].transitive_srcs.to_list() + tf_toolchain.runtime.deps + tfvars_deps
+    # find file ending with tfvars
+    tfvars_file = [file for file in tfvars_deps if file.short_path.endswith(".tfvars")][0]
+
+    deps = ctx.attr.module[TfModuleInfo].transitive_srcs.to_list() + tf_toolchain.runtime.deps + tfvars_deps + backend_deps
 
     return [DefaultInfo(
         executable = init_script,
-        runfiles = ctx.runfiles(files = deps),
+        runfiles = ctx.runfiles(files = deps, symlinks = {
+            ctx.attr.module.label.package + "/bazel.auto.tfvars": tfvars_file,
+            ctx.attr.module.label.package + "/bazel.backend.tf": backend_deps[0] if backend_deps else None,
+        }),
     )]
 
 tf_init = rule(
@@ -124,6 +177,9 @@ tf_init = rule(
         ),
         "tfvars": attr.label(
             doc = "The tfvars target to use for the module.",
+        ),
+        "backend": attr.label(
+            doc = "The backend target to use for the module.",
         ),
         "_script_template": attr.label(
             default = Label(":tf_init.sh"),
@@ -161,13 +217,20 @@ def tf_plan_impl(ctx):
     )
 
     tfvars_deps = (ctx.attr.tfvars[DefaultInfo].files.to_list() if ctx.attr.tfvars else [])
+    backend_deps = (ctx.attr.backend[DefaultInfo].files.to_list() if ctx.attr.backend else [])
+
+    # find file ending with tfvars
+    tfvars_file = [file for file in tfvars_deps if file.short_path.endswith(".tfvars")][0]
 
     # Run the init script
-    deps = ctx.attr.module[TfModuleInfo].transitive_srcs.to_list() + tf_toolchain.runtime.deps + tfvars_deps
+    deps = ctx.attr.module[TfModuleInfo].transitive_srcs.to_list() + tf_toolchain.runtime.deps + tfvars_deps + backend_deps
 
     return [DefaultInfo(
         executable = plan_script,
-        runfiles = ctx.runfiles(files = deps),
+        runfiles = ctx.runfiles(files = deps, symlinks = {
+            ctx.attr.module.label.package + "/bazel.auto.tfvars": tfvars_file,
+            ctx.attr.module.label.package + "/bazel.backend.tf": backend_deps[0] if backend_deps else None,
+        }),
     )]
 
 tf_plan = rule(
@@ -181,6 +244,9 @@ tf_plan = rule(
         ),
         "tfvars": attr.label(
             doc = "The tfvars target to use for the module.",
+        ),
+        "backend": attr.label(
+            doc = "The backend target to use for the module.",
         ),
         "_script_template": attr.label(
             default = Label(":tf_plan.sh"),
@@ -218,12 +284,19 @@ def tf_apply_impl(ctx):
     )
 
     tfvars_deps = (ctx.attr.tfvars[DefaultInfo].files.to_list() if ctx.attr.tfvars else [])
+    backend_deps = (ctx.attr.backend[DefaultInfo].files.to_list() if ctx.attr.backend else [])
 
-    deps = ctx.attr.module[TfModuleInfo].transitive_srcs.to_list() + tf_toolchain.runtime.deps + tfvars_deps
+    # find file ending with tfvars
+    tfvars_file = [file for file in tfvars_deps if file.short_path.endswith(".tfvars")][0]
+
+    deps = ctx.attr.module[TfModuleInfo].transitive_srcs.to_list() + tf_toolchain.runtime.deps + tfvars_deps + backend_deps
 
     return [DefaultInfo(
         executable = apply_script,
-        runfiles = ctx.runfiles(files = deps),
+        runfiles = ctx.runfiles(files = deps, symlinks = {
+            ctx.attr.module.label.package + "/bazel.auto.tfvars": tfvars_file,
+            ctx.attr.module.label.package + "/bazel.backend.tf": backend_deps[0] if backend_deps else None,
+        }),
     )]
 
 tf_apply = rule(
@@ -237,6 +310,9 @@ tf_apply = rule(
         ),
         "tfvars": attr.label(
             doc = "The tfvars target to use for the module.",
+        ),
+        "backend": attr.label(
+            doc = "The backend target to use for the module.",
         ),
         "_script_template": attr.label(
             default = Label(":tf_apply.sh"),
