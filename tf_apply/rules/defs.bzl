@@ -162,7 +162,7 @@ def tf_init_impl(ctx):
         executable = init_script,
         runfiles = ctx.runfiles(files = deps, symlinks = {
             ctx.attr.module.label.package + "/bazel.auto.tfvars": tfvars_file,
-            ctx.attr.module.label.package + "/bazel.backend.tf": backend_deps[0] if backend_deps else None
+            ctx.attr.module.label.package + "/bazel.backend.tf": backend_deps[0] if backend_deps else None,
         }),
     )]
 
@@ -229,7 +229,7 @@ def tf_plan_impl(ctx):
         executable = plan_script,
         runfiles = ctx.runfiles(files = deps, symlinks = {
             ctx.attr.module.label.package + "/bazel.auto.tfvars": tfvars_file,
-            ctx.attr.module.label.package + "/bazel.backend.tf": backend_deps[0] if backend_deps else None
+            ctx.attr.module.label.package + "/bazel.backend.tf": backend_deps[0] if backend_deps else None,
         }),
     )]
 
@@ -295,7 +295,7 @@ def tf_apply_impl(ctx):
         executable = apply_script,
         runfiles = ctx.runfiles(files = deps, symlinks = {
             ctx.attr.module.label.package + "/bazel.auto.tfvars": tfvars_file,
-            ctx.attr.module.label.package + "/bazel.backend.tf": backend_deps[0] if backend_deps else None
+            ctx.attr.module.label.package + "/bazel.backend.tf": backend_deps[0] if backend_deps else None,
         }),
     )]
 

@@ -2,8 +2,7 @@
 This module provides macros and rules for initializing, planning, and applying Terraform modules using rules_tf and rules_tf_apply.
 """
 
-load("@rules_tf//tf:def.bzl", _tf_module = "tf_module")
-load("@rules_tf_apply//tf_apply/rules:defs.bzl", _tf_apply = "tf_apply", _tf_init = "tf_init", _tf_plan = "tf_plan", _tf_vars = "tf_vars", _tf_backend = "tf_backend")
+load("@rules_tf_apply//tf_apply/rules:defs.bzl", _tf_apply = "tf_apply", _tf_backend = "tf_backend", _tf_init = "tf_init", _tf_plan = "tf_plan", _tf_vars = "tf_vars")
 
 tf_apply = _tf_apply
 tf_init = _tf_init
@@ -12,14 +11,13 @@ tf_vars = _tf_vars
 tf_backend = _tf_backend
 
 def tf_root_module(
-    name,
-    module,
-    backend,
-    tfvars = {},
-    tfvars_deps = {},
-    tags = [],
-    visibility = ["//visibility:private"],
-):
+        name,
+        module,
+        backend,
+        tfvars = {},
+        tfvars_deps = {},
+        tags = [],
+        visibility = ["//visibility:private"]):
     """
     Macro to create a Terraform module and apply rules for initialization, planning, and applying.
 
@@ -39,7 +37,7 @@ def tf_root_module(
         visibility = visibility,
     )
 
-    if  backend:
+    if backend:
         # Backend is an object with one key, which is the backend type
         if len(backend.keys()) > 1:
             fail("backend attribute must have exactly one backend type")
