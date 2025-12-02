@@ -58,7 +58,7 @@ def tf_root_module(
         module = module,
         tfvars = ":{}.tfvars".format(name),
         backend = ":{}.backend".format(name),
-        tags = tags,
+        tags = ["tf", "tf:init"] + tags,
         visibility = visibility,
     )
 
@@ -67,7 +67,7 @@ def tf_root_module(
         module = module,
         tfvars = ":{}.tfvars".format(name),
         backend = ":{}.backend".format(name),
-        tags = tags,
+        tags = ["tf", "tf:plan"] + tags,
         visibility = visibility,
     )
 
@@ -76,6 +76,6 @@ def tf_root_module(
         module = module,
         tfvars = ":{}.tfvars".format(name),
         backend = ":{}.backend".format(name),
-        tags = tags,
+        tags = ["tf", "tf:apply"] + tags,
         visibility = visibility,
     )
