@@ -30,6 +30,8 @@ rm -rf "$PWD/$TF_DIR/.terraform.lock.hcl"
 rm -rf "$OUT_DIR/.terraform"
 rm -rf "$OUT_DIR/.terraform.lock.hcl"
 
+echo "Running 'terraform init' in directory: $PWD/$TF_DIR"
+
 # Run terraform init
 $TF_BIN_PATH -chdir="$TF_DIR" init -input=false -plugin-dir="$TF_PLUGINS_DIR" $@
 
