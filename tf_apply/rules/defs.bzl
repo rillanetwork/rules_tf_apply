@@ -154,16 +154,17 @@ def tf_init_impl(ctx):
     backend_deps = (ctx.attr.backend[DefaultInfo].files.to_list() if ctx.attr.backend else [])
 
     # find file ending with tfvars
-    tfvars_file = [file for file in tfvars_deps if file.short_path.endswith(".tfvars")][0]
+    tfvars_files = [file for file in tfvars_deps if file.short_path.endswith(".tfvars")]
 
     deps = ctx.attr.module[TfModuleInfo].transitive_srcs.to_list() + tf_toolchain.runtime.deps + tfvars_deps + backend_deps
+    symlinks = {
+        ctx.attr.module.label.package + "/bazel.auto.tfvars": tfvars_files[0] if tfvars_files else None,
+        ctx.attr.module.label.package + "/bazel.backend.tf": backend_deps[0] if backend_deps else None,
+    }
 
     return [DefaultInfo(
         executable = init_script,
-        runfiles = ctx.runfiles(files = deps, symlinks = {
-            ctx.attr.module.label.package + "/bazel.auto.tfvars": tfvars_file,
-            ctx.attr.module.label.package + "/bazel.backend.tf": backend_deps[0] if backend_deps else None,
-        }),
+        runfiles = ctx.runfiles(files = deps, symlinks = {k: v for k, v in symlinks.items() if v}),
     )]
 
 tf_init = rule(
@@ -220,17 +221,18 @@ def tf_plan_impl(ctx):
     backend_deps = (ctx.attr.backend[DefaultInfo].files.to_list() if ctx.attr.backend else [])
 
     # find file ending with tfvars
-    tfvars_file = [file for file in tfvars_deps if file.short_path.endswith(".tfvars")][0]
+    tfvars_files = [file for file in tfvars_deps if file.short_path.endswith(".tfvars")]
 
     # Run the init script
     deps = ctx.attr.module[TfModuleInfo].transitive_srcs.to_list() + tf_toolchain.runtime.deps + tfvars_deps + backend_deps
+    symlinks = {
+       ctx.attr.module.label.package + "/bazel.auto.tfvars": tfvars_files[0] if tfvars_files else None,
+       ctx.attr.module.label.package + "/bazel.backend.tf": backend_deps[0] if backend_deps else None,
+    }
 
     return [DefaultInfo(
         executable = plan_script,
-        runfiles = ctx.runfiles(files = deps, symlinks = {
-            ctx.attr.module.label.package + "/bazel.auto.tfvars": tfvars_file,
-            ctx.attr.module.label.package + "/bazel.backend.tf": backend_deps[0] if backend_deps else None,
-        }),
+        runfiles = ctx.runfiles(files = deps, symlinks = {k: v for k, v in symlinks.items() if v}),
     )]
 
 tf_plan = rule(
@@ -287,16 +289,17 @@ def tf_apply_impl(ctx):
     backend_deps = (ctx.attr.backend[DefaultInfo].files.to_list() if ctx.attr.backend else [])
 
     # find file ending with tfvars
-    tfvars_file = [file for file in tfvars_deps if file.short_path.endswith(".tfvars")][0]
+    tfvars_files = [file for file in tfvars_deps if file.short_path.endswith(".tfvars")]
 
     deps = ctx.attr.module[TfModuleInfo].transitive_srcs.to_list() + tf_toolchain.runtime.deps + tfvars_deps + backend_deps
+    symlinks = {
+       ctx.attr.module.label.package + "/bazel.auto.tfvars": tfvars_files[0] if tfvars_files else None,
+       ctx.attr.module.label.package + "/bazel.backend.tf": backend_deps[0] if backend_deps else None,
+    }
 
     return [DefaultInfo(
         executable = apply_script,
-        runfiles = ctx.runfiles(files = deps, symlinks = {
-            ctx.attr.module.label.package + "/bazel.auto.tfvars": tfvars_file,
-            ctx.attr.module.label.package + "/bazel.backend.tf": backend_deps[0] if backend_deps else None,
-        }),
+        runfiles = ctx.runfiles(files = deps, symlinks = {k: v for k, v in symlinks.items() if v}),
     )]
 
 tf_apply = rule(
