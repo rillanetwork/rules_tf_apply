@@ -47,7 +47,7 @@ def tf_vars_impl(ctx):
     tfvars = dict(ctx.attr.tfvars)
 
     for key, target in ctx.attr.tfvars_deps.items():
-        tfvar_deps.extend(target.files.to_list())
+        tfvar_deps.append(target.files)
 
         rel_path = relative_path(target.files.to_list()[0].short_path, ctx.attr.module.label.package)
         tfvars[key] = rel_path
@@ -57,7 +57,7 @@ def tf_vars_impl(ctx):
         content = "\n".join(['{}="{}"'.format(key, value) for key, value in tfvars.items()]) + "\n",
     )
 
-    return [DefaultInfo(files = depset([tfvars_file], transitive = [depset(tfvar_deps)]))]
+    return [DefaultInfo(files = depset([tfvars_file], transitive = [depset(transitive = tfvar_deps)]))]
 
 tf_vars = rule(
     implementation = tf_vars_impl,
