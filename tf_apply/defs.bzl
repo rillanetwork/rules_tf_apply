@@ -16,6 +16,7 @@ def tf_root_module(
         backend,
         tfvars = {},
         tfvars_deps = {},
+        output_json = False,
         tags = [],
         visibility = ["//visibility:private"]):
     """
@@ -67,6 +68,7 @@ def tf_root_module(
         module = module,
         tfvars = ":{}.tfvars".format(name),
         backend = ":{}.backend".format(name),
+        output_json = output_json,
         tags = tags,
         visibility = visibility,
     )
