@@ -41,7 +41,7 @@ def tf_vars_impl(ctx):
     Returns:
         DefaultInfo with the generated tfvars file.
     """
-    tfvars_file = ctx.actions.declare_file("{}.bazel.auto.tfvars".format(ctx.attr.name_prefix))
+    tfvars_file = ctx.actions.declare_file("{}.bazel.auto.tfvars.generated".format(ctx.attr.name_prefix))
 
     tfvar_deps = []
     tfvars = dict(ctx.attr.tfvars)
@@ -94,7 +94,7 @@ def tf_backend_impl(ctx):
         An empty list as this rule does not produce any outputs.
     """
 
-    backend_file = ctx.actions.declare_file("{}.bazel.backend.tf".format(ctx.attr.name_prefix))
+    backend_file = ctx.actions.declare_file("{}.bazel.backend.tf.generated".format(ctx.attr.name_prefix))
     backend_content = 'terraform {{\n  backend "{}" {{\n'.format(ctx.attr.type)
     for key, value in ctx.attr.config.items():
         backend_content += '    {} = "{}"\n'.format(key, value)
@@ -154,7 +154,7 @@ def tf_init_impl(ctx):
     backend_deps = (ctx.attr.backend[DefaultInfo].files.to_list() if ctx.attr.backend else [])
 
     # find file ending with tfvars
-    tfvars_file = [file for file in tfvars_deps if file.short_path.endswith(".tfvars")][0]
+    tfvars_file = [file for file in tfvars_deps if file.short_path.endswith(".tfvars.generated")][0]
 
     deps = ctx.attr.module[TfModuleInfo].transitive_srcs.to_list() + tf_toolchain.runtime.deps + tfvars_deps + backend_deps
 
@@ -220,7 +220,7 @@ def tf_plan_impl(ctx):
     backend_deps = (ctx.attr.backend[DefaultInfo].files.to_list() if ctx.attr.backend else [])
 
     # find file ending with tfvars
-    tfvars_file = [file for file in tfvars_deps if file.short_path.endswith(".tfvars")][0]
+    tfvars_file = [file for file in tfvars_deps if file.short_path.endswith(".tfvars.generated")][0]
 
     # Run the init script
     deps = ctx.attr.module[TfModuleInfo].transitive_srcs.to_list() + tf_toolchain.runtime.deps + tfvars_deps + backend_deps
@@ -287,7 +287,7 @@ def tf_apply_impl(ctx):
     backend_deps = (ctx.attr.backend[DefaultInfo].files.to_list() if ctx.attr.backend else [])
 
     # find file ending with tfvars
-    tfvars_file = [file for file in tfvars_deps if file.short_path.endswith(".tfvars")][0]
+    tfvars_file = [file for file in tfvars_deps if file.short_path.endswith(".tfvars.generated")][0]
 
     deps = ctx.attr.module[TfModuleInfo].transitive_srcs.to_list() + tf_toolchain.runtime.deps + tfvars_deps + backend_deps
 
