@@ -2,9 +2,10 @@
 This module provides macros and rules for initializing, planning, and applying Terraform modules using rules_tf and rules_tf_apply.
 """
 
-load("@rules_tf_apply//tf_apply/rules:defs.bzl", _tf_apply = "tf_apply", _tf_backend = "tf_backend", _tf_init = "tf_init", _tf_plan = "tf_plan", _tf_vars = "tf_vars")
+load("@rules_tf_apply//tf_apply/rules:defs.bzl", _tf_apply = "tf_apply", _tf_backend = "tf_backend", _tf_cmd = "tf_cmd", _tf_init = "tf_init", _tf_plan = "tf_plan", _tf_vars = "tf_vars")
 
 tf_apply = _tf_apply
+tf_cmd = _tf_cmd
 tf_init = _tf_init
 tf_plan = _tf_plan
 tf_vars = _tf_vars
@@ -73,6 +74,15 @@ def tf_root_module(
 
     tf_apply(
         name = "{}.apply".format(name),
+        module = module,
+        tfvars = ":{}.tfvars".format(name),
+        backend = ":{}.backend".format(name),
+        tags = tags,
+        visibility = visibility,
+    )
+
+    tf_cmd(
+        name = "{}.tf".format(name),
         module = module,
         tfvars = ":{}.tfvars".format(name),
         backend = ":{}.backend".format(name),

@@ -76,3 +76,26 @@ bazel run //:my_tf_module.plan -- -refresh=false -parallelism=10
 ```
 
 Any arguments passed after `--` are forwarded directly to the underlying Terraform command.
+
+## Running Other Terraform Subcommands
+
+For terraform subcommands without a dedicated target (`destroy`, `state`, `import`, `taint`, `output`, `refresh`, `show`, `validate`, ...), `tf_root_module` exposes a generic `<name>.tf` target that forwards all arguments to `terraform -chdir=<module>`:
+
+```bash
+# Read-only commands
+bazel run //:my_tf_module.tf -- validate
+bazel run //:my_tf_module.tf -- state list
+bazel run //:my_tf_module.tf -- output
+
+# Show a plan that was previously generated
+bazel run //:my_tf_module.plan
+bazel run //:my_tf_module.tf -- show plan.tfplan
+
+# Import existing infrastructure
+bazel run //:my_tf_module.tf -- import aws_iam_role.example example-role
+
+# Destroy (auto-approve is deliberately not implicit — pass it explicitly)
+bazel run //:my_tf_module.tf -- destroy -auto-approve -target=null_resource.x
+```
+
+Unlike `.apply`, the `.tf` target adds no implicit flags (no `-auto-approve`, no `-input=false`, no plan file). The caller is responsible for whatever terraform needs. This keeps destructive operations opt-in rather than baked into the target.
