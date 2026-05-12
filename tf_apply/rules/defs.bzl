@@ -258,6 +258,73 @@ tf_plan = rule(
     toolchains = ["@rules_tf//:tf_toolchain_type"],
 )
 
+def tf_destroy_impl(ctx):
+    """
+    Builds a script to run `terraform plan -destroy` for the specified module.
+    Writes the destroy plan to plan.tfplan so a subsequent `<mod>.apply` will
+    apply it — same review-then-execute pattern as the forward `.plan`/`.apply`
+    flow.
+
+    Args:
+        ctx: The rule context
+
+    Returns:
+        An executable DefaultInfo object with the output destroy-plan script.
+    """
+
+    tf_toolchain = ctx.toolchains["@rules_tf//:tf_toolchain_type"]
+
+    destroy_script = ctx.actions.declare_file(ctx.label.name)
+
+    ctx.actions.expand_template(
+        output = destroy_script,
+        template = ctx.file._script_template,
+        substitutions = {
+            "%TF_BIN_PATH%": tf_toolchain.runtime.tf.short_path,
+            "%TF_DIR%": ctx.attr.module.label.package,
+            "%TF_PLUGINS_DIR%": tf_toolchain.runtime.mirror.short_path,
+        },
+    )
+
+    tfvars_deps = (ctx.attr.tfvars[DefaultInfo].files.to_list() if ctx.attr.tfvars else [])
+    backend_deps = (ctx.attr.backend[DefaultInfo].files.to_list() if ctx.attr.backend else [])
+
+    tfvars_file = [file for file in tfvars_deps if file.short_path.endswith(".tfvars.generated")][0]
+
+    deps = ctx.attr.module[TfModuleInfo].transitive_srcs.to_list() + tf_toolchain.runtime.deps + tfvars_deps + backend_deps
+
+    return [DefaultInfo(
+        executable = destroy_script,
+        runfiles = ctx.runfiles(files = deps, symlinks = {
+            ctx.attr.module.label.package + "/bazel.auto.tfvars": tfvars_file,
+            ctx.attr.module.label.package + "/bazel.backend.tf": backend_deps[0] if backend_deps else None,
+        }),
+    )]
+
+tf_destroy = rule(
+    implementation = tf_destroy_impl,
+    executable = True,
+    attrs = {
+        "module": attr.label(
+            allow_single_file = True,
+            mandatory = True,
+            doc = "The Tf module to plan a destroy for.",
+        ),
+        "tfvars": attr.label(
+            doc = "The tfvars target to use for the module.",
+        ),
+        "backend": attr.label(
+            doc = "The backend target to use for the module.",
+        ),
+        "_script_template": attr.label(
+            default = Label(":tf_destroy.sh"),
+            allow_single_file = True,
+            doc = "Script to run `terraform plan -destroy` for the module.",
+        ),
+    },
+    toolchains = ["@rules_tf//:tf_toolchain_type"],
+)
+
 def tf_apply_impl(ctx):
     """
     Builds a script to run tf apply for the specified module.
