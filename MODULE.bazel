@@ -1,4 +1,4 @@
-""" This file is used to define the module for the Peer Core repository."""
+"""Bazel module definition for rules_tf_apply."""
 
 module(
     name = "rules_tf_apply",
