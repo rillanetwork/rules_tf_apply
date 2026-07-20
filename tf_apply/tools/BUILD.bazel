@@ -1,0 +1,35 @@
+load("@rules_python//python:defs.bzl", "py_binary", "py_test")
+
+py_binary(
+    name = "list_modules",
+    srcs = ["list_modules.py"],
+    main = "list_modules.py",
+    visibility = ["//visibility:public"],
+)
+
+py_test(
+    name = "list_modules_test",
+    srcs = [
+        "list_modules.py",
+        "list_modules_test.py",
+    ],
+    imports = ["."],
+    main = "list_modules_test.py",
+)
+
+py_binary(
+    name = "run",
+    srcs = ["run.py"],
+    main = "run.py",
+    visibility = ["//visibility:public"],
+)
+
+py_test(
+    name = "run_test",
+    srcs = [
+        "run.py",
+        "run_test.py",
+    ],
+    imports = ["."],
+    main = "run_test.py",
+)
