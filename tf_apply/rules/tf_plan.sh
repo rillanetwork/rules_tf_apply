@@ -8,6 +8,7 @@ set -euo pipefail
 TF_BIN_PATH="${PWD}/%TF_BIN_PATH%"
 TF_DIR="%TF_DIR%"
 TF_PLUGINS_DIR="${PWD}/%TF_PLUGINS_DIR%"
+TF_OUTPUT_JSON=%TF_OUTPUT_JSON%
 
 if [ -z "${BUILD_WORKSPACE_DIRECTORY:-}" ]; then
     echo "BUILD_WORKSPACE_DIRECTORY is not set. Please set it before running this script."
@@ -37,6 +38,9 @@ fi
 test -d "$TF_DIR/.terraform" && rm -rf "$TF_DIR/.terraform"
 test -f "$TF_DIR/.terraform.lock.hcl" && rm -rf "$TF_DIR/.terraform.lock.hcl"
 test -f "$TF_DIR/plan.tfplan" && rm -rf "$TF_DIR/plan.tfplan"
+if [ $TF_OUTPUT_JSON -eq 1 ]; then
+  test -f "$TF_DIR/plan.tfplan" && rm -rf "$TF_DIR/plan.tfplan.json"
+fi
 
 ln -sfn "$OUT_DIR/.terraform" "$TF_DIR/.terraform"
 ln -sfn "$OUT_DIR/.terraform.lock.hcl" "$TF_DIR/.terraform.lock.hcl"
@@ -45,3 +49,9 @@ $TF_BIN_PATH -chdir="$TF_DIR" plan -input=false -out="plan.tfplan" "$@"
 
 # symlink the plan output to the output directory
 ln -sfn "$PWD/$TF_DIR/plan.tfplan" "$OUT_DIR/plan.tfplan"
+
+if [ $TF_OUTPUT_JSON -eq 1 ]; then
+    # Transform the plan into json format, and symlink to the output directory
+    $TF_BIN_PATH -chdir="$TF_DIR" show -json "plan.tfplan" > "plan.tfplan.json"
+    ln -sfn "$PWD/$TF_DIR/plan.tfplan.json" "$OUT_DIR/plan.tfplan.json"
+fi

@@ -212,6 +212,7 @@ def tf_plan_impl(ctx):
         substitutions = {
             "%TF_BIN_PATH%": tf_toolchain.runtime.tf.short_path,
             "%TF_DIR%": ctx.attr.module.label.package,
+            "%TF_OUTPUT_JSON%": "1" if ctx.attr.output_json else "0",
             "%TF_PLUGINS_DIR%": tf_toolchain.runtime.mirror.short_path,
         },
     )
@@ -247,6 +248,10 @@ tf_plan = rule(
         ),
         "backend": attr.label(
             doc = "The backend target to use for the module.",
+        ),
+        "output_json": attr.bool(
+            default = False,
+            doc = "Whether to also output a JSON-formatted plan",
         ),
         "_script_template": attr.label(
             default = Label(":tf_plan.sh"),
