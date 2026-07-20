@@ -242,6 +242,15 @@ def parse_target(target: str, manual_packages: set[str], affected: set[str], mod
 
 
 def main():
+    # `bazel run` executes from an ephemeral runfiles dir, so the bazel query
+    # and git subprocesses below (which use relative paths and expect to be at
+    # the workspace root) must be anchored there. BUILD_WORKSPACE_DIRECTORY is
+    # set by `bazel run`; when absent (direct script invocation / tests) we
+    # stay in the current dir, matching this tool's plain-script origin.
+    workspace_dir = os.environ.get("BUILD_WORKSPACE_DIRECTORY")
+    if workspace_dir:
+        os.chdir(workspace_dir)
+
     query_path = sys.argv[1] if len(sys.argv) > 1 else "//terraform/..."
     targets = list_plan_targets(query_path)
     manual_packages = list_manual_packages(query_path)
