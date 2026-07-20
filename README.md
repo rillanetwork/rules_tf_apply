@@ -117,12 +117,12 @@ Unlike `.apply`, the `.tf` target adds no implicit flags (no `-auto-approve`, no
 
 Two versioned `py_binary` tools ship with this ruleset so consuming repos share one implementation of terraform module enumeration and fan-out orchestration. A change to affected-detection or the artifact schema lands here once and every consumer inherits it on the next pin bump.
 
-### `@rules_tf_apply//tf_apply/tools:list_modules`
+### `@rules_tf_apply//tools:list_modules`
 
 Enumerates `tf_root_module` targets (via `kind(tf_plan, <query_path>)`) and emits a JSON matrix describing each one:
 
 ```bash
-BASE_REF=origin/main bazel run @rules_tf_apply//tf_apply/tools:list_modules -- //terraform/...
+BASE_REF=origin/main bazel run @rules_tf_apply//tools:list_modules -- //terraform/...
 ```
 
 Each row: `{"package", "module_package", "name", "skip", "affected"}`.
@@ -133,12 +133,12 @@ Each row: `{"package", "module_package", "name", "skip", "affected"}`.
 
 This output is **cloud-neutral by design**: it carries module identity plus the skip/affected classification and nothing tenant-specific. A consumer that keys CI off deployment topology (an account per module, say) decorates these rows with its own fields from its own path convention — the ruleset does not own any tenant's cloud/account layout.
 
-### `@rules_tf_apply//tf_apply/tools:run`
+### `@rules_tf_apply//tools:run`
 
 Fans out `init`/`plan`/`apply` over the modules under a query, in-process:
 
 ```bash
-bazel run @rules_tf_apply//tf_apply/tools:run -- //terraform/... init plan \
+bazel run @rules_tf_apply//tools:run -- //terraform/... init plan \
   [--extra_var_file vars.tfvars] [--plan_artifacts_dir out/]
 ```
 
