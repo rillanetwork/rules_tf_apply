@@ -1,0 +1,122 @@
+name: Shutdown Bazel
+description: |
+  Run `bazel shutdown` to flush BES/remote cache uploads and close the server.
+  Call with `if: always()` so shutdown runs on failure and cancellation too.
+
+inputs:
+  cache-version:
+    description: Must match the value passed to setup-bazel.
+    required: false
+    default: '1'
+  cache-save:
+    description: |
+      True on canonical jobs that should write the cache. PRs, bench, and
+      ad-hoc jobs leave this false to restore-only without polluting the
+      cache namespace.
+    required: false
+    default: 'false'
+  external-repository-maximum-mb:
+    description: |
+      Drop any `contents/<hash>/<UUID>/` extraction over this many megabytes
+      before save. Pruned UUIDs re-fetch from still-cached `cas/` archives
+      next run. 200 keeps each per-OS save near 4 GB so macOS + Linux stay
+      under GitHub Actions' 10 GB per-repo cache budget. Empty disables.
+    required: false
+    default: '200'
+
+runs:
+  using: composite
+  steps:
+    # Always run, even on cancel/failure, so BES uploads don't get cut off
+    # by runner teardown. Composite action steps don't support
+    # `timeout-minutes`, so use timeout(1) where the runner provides it.
+    - name: Bazel shutdown
+      shell: bash
+      run: |
+        set +e
+        if command -v timeout >/dev/null 2>&1; then
+          timeout 120 bazel shutdown 2>&1
+        elif command -v gtimeout >/dev/null 2>&1; then
+          gtimeout 120 bazel shutdown 2>&1
+        else
+          bazel shutdown 2>&1
+        fi
+        status=$?
+        if ((status != 0)); then
+          echo "::warning::bazel shutdown returned non-zero or timed out, continuing"
+        fi
+
+    # The fingerprint file setup-bazel wrote is already in `key=value\n` GITHUB_OUTPUT format,
+    # so re-publish it verbatim. Any new field added in setup becomes a shutdown output here for free.
+    - name: Republish fingerprint as step outputs
+      id: fingerprint
+      if: inputs.cache-save == 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        if [[ ! -f .bazel-fingerprint ]]; then
+          echo "::warning::.bazel-fingerprint missing; setup-bazel pre-step did not run. Skipping save."
+          echo "skip=true" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        cat .bazel-fingerprint >> "$GITHUB_OUTPUT"
+        echo "skip=false" >> "$GITHUB_OUTPUT"
+
+    # Probe with lookup-only first so we don't pay an upload when neither the
+    # bazelisk launcher version nor `.bazelversion` has changed.
+    - name: Probe bazelisk cache
+      id: bazelisk-probe
+      if: inputs.cache-save == 'true' && steps.fingerprint.outputs.skip != 'true'
+      uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      with:
+        path: |
+          ${{ steps.fingerprint.outputs.bazelisk_path }}
+          ${{ runner.temp }}/bazelisk-bin
+        key: bazelisk-cache-${{ inputs.cache-version }}-${{ steps.fingerprint.outputs.platform }}-${{ steps.fingerprint.outputs.bazelisk_version }}-${{ steps.fingerprint.outputs.bazel_version }}
+        lookup-only: true
+
+    - name: Save bazelisk cache
+      if: inputs.cache-save == 'true' && steps.fingerprint.outputs.skip != 'true' && steps.bazelisk-probe.outputs.cache-hit != 'true'
+      uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      with:
+        path: |
+          ${{ steps.fingerprint.outputs.bazelisk_path }}
+          ${{ runner.temp }}/bazelisk-bin
+        key: bazelisk-cache-${{ inputs.cache-version }}-${{ steps.fingerprint.outputs.platform }}-${{ steps.fingerprint.outputs.bazelisk_version }}-${{ steps.fingerprint.outputs.bazel_version }}
+      continue-on-error: true
+
+    - name: Compute marker-enhanced repo save key
+      id: repo-key
+      if: inputs.cache-save == 'true' && steps.fingerprint.outputs.skip != 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        markerhash=$("$GITHUB_ACTION_PATH"/external-marker-fingerprint.sh)
+        key="repository-cache-${{ inputs.cache-version }}-${{ steps.fingerprint.outputs.platform }}-${{ steps.fingerprint.outputs.fingerprint }}-${markerhash}"
+        echo "key=${key}" >> "$GITHUB_OUTPUT"
+        echo "Marker-enhanced save key: ${key}"
+
+    - name: Probe whether repository cache already exists
+      id: repo-probe
+      if: inputs.cache-save == 'true' && steps.fingerprint.outputs.skip != 'true'
+      uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      with:
+        path: ~/.cache/bazel-repo
+        key: ${{ steps.repo-key.outputs.key }}
+        lookup-only: true
+
+    - name: Prune oversized repository-cache extractions
+      if: inputs.cache-save == 'true' && steps.fingerprint.outputs.skip != 'true' && steps.repo-probe.outputs.cache-hit != 'true' && inputs.external-repository-maximum-mb != ''
+      shell: bash
+      env:
+        MAX_MB: ${{ inputs.external-repository-maximum-mb }}
+      run: |
+        "$GITHUB_ACTION_PATH"/external-prune.sh
+
+    - name: Save repository cache
+      if: inputs.cache-save == 'true' && steps.fingerprint.outputs.skip != 'true' && steps.repo-probe.outputs.cache-hit != 'true'
+      uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      with:
+        path: ~/.cache/bazel-repo
+        key: ${{ steps.repo-key.outputs.key }}
+      continue-on-error: true

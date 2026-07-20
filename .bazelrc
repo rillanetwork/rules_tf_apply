@@ -1,0 +1,27 @@
+# Available `--config=` options:
+#   ci   CI behaviour: suppress curses/colors, verbose failures, tolerate lockfile
+#        drift from non-Linux pushes, and disable repo-contents-cache GC (runners
+#        are ephemeral, and in-flight GC racing with active reads produces
+#        transient CAS errors against the GHA-restored repository cache). Applied
+#        automatically by .github/actions/setup-bazel, which writes
+#        `common --config=ci` into the CI user bazelrc.
+
+# Override the default `--lockfile_mode=error`, which is problematic when pushing
+# to CI from a non-Linux host (the committed lock is generated on macOS).
+common:ci --lockfile_mode=update
+
+# Disable the verbose rc-file dump at the start of each invocation.
+common:ci --noannounce_rc
+
+# Disable cursor-control sequences that render as garbage in GitHub Actions logs.
+common:ci --curses=no
+common:ci --color=no
+
+# Runners are ephemeral, so GC only risks racing active reads of the restored cache.
+common:ci --repo_contents_cache_gc_max_age=0
+
+# If a command fails, print out the full command line.
+build:ci --verbose_failures
+
+# Import a git-ignored .bazelrc.local file, if it exists.
+try-import %workspace%/.bazelrc.local

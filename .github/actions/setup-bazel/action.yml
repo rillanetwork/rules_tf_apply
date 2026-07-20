@@ -1,0 +1,94 @@
+name: Setup Bazel
+description: |
+  Install Bazelisk, restore Bazelisk and repository caches for the current MODULE.bazel.lock
+  fingerprint, write the CI bazelrc, and run `bazel info --announce_rc` to warm the server.
+  Must be paired with a `shutdown-bazel` step at the end of the job.
+
+inputs:
+  cache-version:
+    description: |
+      Namespace component embedded in every cache key written by this action
+      (repository-cache and bazelisk-cache). Bump to invalidate every cache
+      entry. Must match the value passed to shutdown-bazel.
+    required: false
+    default: '1'
+  buildbuddy-api-key:
+    description: BuildBuddy API key, sent as `x-buildbuddy-api-key`. Empty disables.
+    required: false
+    default: ''
+  bazelisk-version:
+    description: |
+      Bazelisk release tag downloaded from github.com/bazelbuild/bazelisk/releases.
+      Both the launcher and the Bazel release Bazelisk dispatches to are cached
+      under `bazelisk-cache-...`; bumping this invalidates the launcher half,
+      bumping `.bazelversion` invalidates the Bazel-release half.
+    required: false
+    default: v1.29.0
+
+outputs:
+  bazel-version:
+    description: Trimmed `.bazelversion` content, the Bazel release bazelisk dispatches to.
+    value: ${{ steps.fingerprint.outputs.bazel_version }}
+
+runs:
+  using: composite
+  steps:
+    - name: Compute Bazel cache fingerprint
+      id: fingerprint
+      shell: bash
+      env:
+        BAZELISK_VERSION: ${{ inputs.bazelisk-version }}
+      run: |
+        "$GITHUB_ACTION_PATH"/fingerprint.sh | tee .bazel-fingerprint >> "$GITHUB_OUTPUT"
+
+    # Bazelisk first so a launcher failure surfaces before the multi-GiB repository-cache restore.
+    # Cache holds both the launcher binary and the bazel release bazelisk dispatches to.
+    - name: Restore bazelisk cache
+      id: bazelisk-restore
+      uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      with:
+        path: |
+          ${{ steps.fingerprint.outputs.bazelisk_path }}
+          ${{ runner.temp }}/bazelisk-bin
+        key: bazelisk-cache-${{ inputs.cache-version }}-${{ steps.fingerprint.outputs.platform }}-${{ steps.fingerprint.outputs.bazelisk_version }}-${{ steps.fingerprint.outputs.bazel_version }}
+
+    - name: Install bazelisk launcher
+      shell: bash
+      env:
+        BAZELISK_VERSION: ${{ inputs.bazelisk-version }}
+      run: |
+        "$GITHUB_ACTION_PATH"/install-bazelisk.sh
+
+    # Restore raw archives + `--repo_contents_cache`-extracted `contents/` ourselves.
+    - name: Restore Bazel repository cache
+      id: repo-restore
+      uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      with:
+        path: ~/.cache/bazel-repo
+        key: repository-cache-${{ inputs.cache-version }}-${{ steps.fingerprint.outputs.platform }}-${{ steps.fingerprint.outputs.fingerprint }}-no-marker-yet
+        restore-keys: |
+          repository-cache-${{ inputs.cache-version }}-${{ steps.fingerprint.outputs.platform }}-${{ steps.fingerprint.outputs.fingerprint }}-
+          repository-cache-${{ inputs.cache-version }}-${{ steps.fingerprint.outputs.platform }}-
+
+    - name: Write user bazelrc
+      shell: bash
+      env:
+        BUILDBUDDY_API_KEY: ${{ inputs.buildbuddy-api-key }}
+      run: |
+        {
+          # Interacts poorly with rules that set `reproducible = True` (e.g. @llvm).
+          echo "startup --noexperimental_remote_repo_contents_cache"
+          echo "startup --host_jvm_args=-Xmx3g"
+          echo "common --repository_cache=~/.cache/bazel-repo"
+          echo "common --config=ci"
+          if [[ -n "${BUILDBUDDY_API_KEY}" ]]; then
+            echo "common --remote_header=x-buildbuddy-api-key=${BUILDBUDDY_API_KEY}"
+          fi
+        } > "$HOME/.bazelrc"
+
+    # Warm the server, show what expanded from various .bazelrc sources, and trigger
+    # bazelisk to download the bazel release into the cache path so shutdown-bazel
+    # can save it.
+    - name: Bazel startup
+      shell: bash
+      run: bazel info --announce_rc
