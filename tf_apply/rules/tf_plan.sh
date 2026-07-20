@@ -39,7 +39,7 @@ test -d "$TF_DIR/.terraform" && rm -rf "$TF_DIR/.terraform"
 test -f "$TF_DIR/.terraform.lock.hcl" && rm -rf "$TF_DIR/.terraform.lock.hcl"
 test -f "$TF_DIR/plan.tfplan" && rm -rf "$TF_DIR/plan.tfplan"
 if [ $TF_OUTPUT_JSON -eq 1 ]; then
-  test -f "$TF_DIR/plan.tfplan" && rm -rf "$TF_DIR/plan.tfplan.json"
+  test -f "$TF_DIR/plan.tfplan.json" && rm -rf "$TF_DIR/plan.tfplan.json"
 fi
 
 ln -sfn "$OUT_DIR/.terraform" "$TF_DIR/.terraform"
@@ -52,6 +52,6 @@ ln -sfn "$PWD/$TF_DIR/plan.tfplan" "$OUT_DIR/plan.tfplan"
 
 if [ $TF_OUTPUT_JSON -eq 1 ]; then
     # Transform the plan into json format, and symlink to the output directory
-    $TF_BIN_PATH -chdir="$TF_DIR" show -json "plan.tfplan" > "plan.tfplan.json"
+    $TF_BIN_PATH -chdir="$TF_DIR" show -json "plan.tfplan" > "$TF_DIR/plan.tfplan.json"
     ln -sfn "$PWD/$TF_DIR/plan.tfplan.json" "$OUT_DIR/plan.tfplan.json"
 fi
