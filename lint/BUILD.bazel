@@ -1,0 +1,29 @@
+load("@buildifier_prebuilt//:rules.bzl", "buildifier")
+
+# Buildifier lives in its own package (not the repo root) so the root BUILD
+# never loads @buildifier_prebuilt — a dev_dependency invisible to consumers.
+# The repo-wide `default_package_metadata = //:package_metadata` (REPO.bazel)
+# makes every consumer-built target implicitly depend on the root package, so
+# the root must stay loadable without dev-only repos.
+
+buildifier(
+    name = "buildifier.fix",
+    exclude_patterns = [
+        "./.git/*",
+        "./node_modules/*",
+    ],
+    lint_mode = "fix",
+    lint_warnings = ["-all"],
+    mode = "fix",
+)
+
+buildifier(
+    name = "buildifier.check",
+    exclude_patterns = [
+        "./.git/*",
+        "./node_modules/*",
+    ],
+    lint_mode = "warn",
+    lint_warnings = ["-all"],
+    mode = "diff",
+)
