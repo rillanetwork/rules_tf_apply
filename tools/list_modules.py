@@ -19,6 +19,12 @@ changed between ``BASE_REF`` (env, e.g. ``origin/main``) and ``HEAD``. When
 ``BASE_REF`` is unset, every module is treated as affected so consumers that
 don't care about change detection see the full list.
 
+A package may declare several ``tf_root_module`` targets (e.g. one BUILD file
+per account/region holding every root deployed there), so all classification
+here — skip, module_package, affected — is keyed by the ``.plan`` target
+label, never by package. Signals that are only package-precise (a changed
+BUILD file, a deleted path) expand to every plan target in that package.
+
 Positional arg ``query_path`` (default ``//terraform/...``) scopes the module
 query so each repo can point at its own tree.
 """
@@ -40,24 +46,23 @@ def list_plan_targets(query_path: str) -> list[str]:
     return sorted({t for t in result.stdout.splitlines() if t.endswith(".plan")})
 
 
-def list_manual_packages(query_path: str) -> set[str]:
-    """Return packages whose plan target is tagged deploy:manual."""
+def list_manual_targets(query_path: str) -> set[str]:
+    """Return plan target labels tagged deploy:manual.
+
+    Keyed by label, not package: a CI-deployed root and a manual root can
+    share a package, and a package-level skip would suppress the wrong one.
+    """
     result = subprocess.run(
         ["bazel", "query", f'attr(tags, "deploy:manual", kind(tf_plan, {query_path}))'],
         capture_output=True,
         text=True,
         check=True,
     )
-    packages = set()
-    for line in result.stdout.splitlines():
-        label = line.removeprefix("//")
-        if ":" in label:
-            packages.add(label.split(":")[0])
-    return packages
+    return {t for t in result.stdout.splitlines() if t.endswith(".plan")}
 
 
 def module_packages(query_path: str) -> dict[str, str]:
-    """Map each tf_plan target's package to the package of its `module`.
+    """Map each tf_plan target label to the package of its `module`.
 
     A ``tf_root_module`` can point ``module =`` at a reusable module in a
     different package (one shared module instantiated by several thin roots,
@@ -66,6 +71,10 @@ def module_packages(query_path: str) -> dict[str, str]:
     must chdir there to read the plan, not at the root's own package. For the
     common ``module = ":self"`` case the two are identical, so consumers can
     treat this as a no-op for every conventional module.
+
+    Keyed by target label: two thin roots in one package can point at
+    different shared stacks, so a package-keyed map would silently collapse
+    to whichever root the query emitted last.
     """
     result = subprocess.run(
         ["bazel", "query", f"kind(tf_plan, {query_path})", "--output", "streamed_jsonproto"],
@@ -81,10 +90,9 @@ def module_packages(query_path: str) -> dict[str, str]:
         name = rule["name"]
         if not name.endswith(".plan"):
             continue
-        pkg = name.removeprefix("//").split(":")[0]
         for attr in rule.get("attribute", []):
             if attr["name"] == "module":
-                mapping[pkg] = attr["stringValue"].removeprefix("//").split(":")[0]
+                mapping[name] = attr["stringValue"].removeprefix("//").split(":")[0]
                 break
     return mapping
 
@@ -159,16 +167,23 @@ def deleted_file_package(path: str, root_packages: set[str]) -> str | None:
     return None
 
 
-def affected_packages(base_ref: str, root_packages: set[str], plan_targets: list[str]) -> set[str]:
-    """Return the set of root module packages affected by changes since base_ref.
+def affected_targets(base_ref: str, plan_targets: list[str]) -> set[str]:
+    """Return the set of plan target labels affected by changes since base_ref.
 
-    With no base_ref, returns the full root_packages set ("all affected"). The
-    returned set always names tf_root_module packages — extra labels from
-    rdeps (intermediate :deps/:module targets, shared child modules) are
-    filtered out via the root_packages intersection.
+    With no base_ref, returns the full plan_targets set ("all affected"). The
+    returned set always names ``.plan`` targets — extra labels from rdeps
+    (intermediate :deps/:module targets, shared child modules) are filtered
+    out via the plan_targets intersection. Package-precise signals (changed
+    BUILD files, deletions) expand to every plan target in their package.
     """
+    plan_target_set = set(plan_targets)
     if not base_ref or not plan_targets:
-        return set(root_packages)
+        return plan_target_set
+
+    pkg_targets: dict[str, set[str]] = {}
+    for t in plan_targets:
+        pkg_targets.setdefault(t.removeprefix("//").split(":")[0], set()).add(t)
+    root_packages = set(pkg_targets)
 
     # Repo-root files (MODULE.bazel, etc.) aren't deps of any tf_module in
     # bazel's graph, so they're invisible to rdeps. We accept under-reporting
@@ -194,12 +209,11 @@ def affected_packages(base_ref: str, root_packages: set[str], plan_targets: list
             # BUILD straight to its package, as we do for deletions below.
             if Path(f).name in ("BUILD.bazel", "BUILD"):
                 pkg = str(Path(f).parent)
-                if pkg in root_packages:
-                    affected.add(pkg)
+                affected.update(pkg_targets.get(pkg, set()))
         else:
             pkg = deleted_file_package(f, root_packages)
             if pkg is not None:
-                affected.add(pkg)
+                affected.update(pkg_targets[pkg])
 
     file_labels = [lbl for lbl in (file_to_label(f) for f in existing_files) if lbl]
     if not file_labels:
@@ -216,15 +230,12 @@ def affected_packages(base_ref: str, root_packages: set[str], plan_targets: list
     )
 
     for line in result.stdout.splitlines():
-        label = line.removeprefix("//")
-        if ":" in label:
-            pkg = label.split(":")[0]
-            if pkg in root_packages:
-                affected.add(pkg)
+        if line in plan_target_set:
+            affected.add(line)
     return affected
 
 
-def parse_target(target: str, manual_packages: set[str], affected: set[str], mod_packages: dict[str, str]) -> dict:
+def parse_target(target: str, manual_targets: set[str], affected: set[str], mod_packages: dict[str, str]) -> dict:
     label = target.removeprefix("//")
     package, target_name = label.split(":")
     name = target_name.removesuffix(".plan")
@@ -234,10 +245,10 @@ def parse_target(target: str, manual_packages: set[str], affected: set[str], mod
         # Package whose bazel-tf working dir holds the rendered terraform; equals
         # `package` unless the tf_root_module points module= at a shared module
         # elsewhere (thin injected roots). CI chdirs here to read the plan.
-        "module_package": mod_packages.get(package, package),
+        "module_package": mod_packages.get(target, package),
         "name": name,
-        "skip": package in manual_packages,
-        "affected": package in affected,
+        "skip": target in manual_targets,
+        "affected": target in affected,
     }
 
 
@@ -253,15 +264,14 @@ def main():
 
     query_path = sys.argv[1] if len(sys.argv) > 1 else "//terraform/..."
     targets = list_plan_targets(query_path)
-    manual_packages = list_manual_packages(query_path)
-    root_packages = {t.removeprefix("//").split(":")[0] for t in targets}
+    manual_targets = list_manual_targets(query_path)
     base_ref = os.environ.get("BASE_REF", "")
     # The rdeps universe is the plan targets themselves: a thin tf_root_module
     # package only emits dotted targets (:name.plan, .tf, …) and no bare :name,
     # so stripping `.plan` would yield an undeclared label and abort the query.
-    affected = affected_packages(base_ref, root_packages, targets)
+    affected = affected_targets(base_ref, targets)
     mod_packages = module_packages(query_path)
-    modules = [parse_target(t, manual_packages, affected, mod_packages) for t in targets]
+    modules = [parse_target(t, manual_targets, affected, mod_packages) for t in targets]
     print(json.dumps(modules))
 
 
