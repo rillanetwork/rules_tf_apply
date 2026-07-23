@@ -1,3 +1,23 @@
+> [!WARNING]
+> **This repository is deprecated and archived.**
+>
+> `rules_tf_apply` has been merged into
+> [**rillanetwork/rules_tf**](https://github.com/rillanetwork/rules_tf) and is no
+> longer maintained here. All of its rules (`tf_root_module`, `tf_init`, `tf_plan`,
+> `tf_apply`, `tf_destroy`, `tf_cmd`) and tools (`list_modules`, `run`) now ship in
+> `rules_tf` from the **v1.0.0** release onward.
+>
+> **To migrate:**
+> 1. Drop the `rules_tf_apply` `bazel_dep` (and any `archive_override`) from
+>    `MODULE.bazel`, and pin `rules_tf` to `v1.0.0` or later.
+> 2. Replace `load("@rules_tf_apply//tf_apply:defs.bzl", ...)` with
+>    `load("@rules_tf//tf_apply:defs.bzl", ...)`.
+> 3. Move tool references from `@rules_tf_apply//tools:...` to `@rules_tf//tools:...`.
+>
+> See the [rules_tf README](https://github.com/rillanetwork/rules_tf#readme) for
+> installation and [rules_tf#11](https://github.com/rillanetwork/rules_tf/pull/11)
+> for the full migration notes.
+
 # Rules for applying TF (Terraform / Tofu) modules using Bazel
 
 This module provides rules to initialize, plan, and apply Terraform modules using Bazel.
